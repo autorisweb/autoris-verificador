@@ -1,76 +1,32 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import subprocess
 import os
-import tempfile
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return 'Microservicio de Verificación con OpenTimestamps activo ✅'
+@app.route("/verificar_ots", methods=["GET", "POST"])
+def verificar_ots():
+    if request.method == "GET":
+        return render_template("verificar_ots.html")
 
-@app.route('/verify')
-def verificar_hash():
-    file_hash = request.args.get('file_hash')
-    if not file_hash:
-        return jsonify({'error': 'Falta el parámetro file_hash'}), 400
+    if "ots_file" not in request.files:
+        return jsonify({"error": "No se envió ningún archivo .ots"}), 400
 
-    ots_url = f'https://a.pool.opentimestamps.org/{file_hash}.ots'
+    file = request.files["ots_file"]
 
-    try:
-        result = subprocess.run(
-            ['ots', 'verify', ots_url],
-            capture_output=True,
-            text=True
-        )
+    if file.filename == "":
+        return jsonify({"error": "Nombre de archivo vacío"}), 400
 
-        if result.returncode == 0:
-            return jsonify({
-                'hash': file_hash,
-                'verificado': True,
-                'resultado': result.stdout
-            })
-        else:
-            return jsonify({
-                'hash': file_hash,
-                'verificado': False,
-                'error': result.stderr
-            })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/verificar_ots', methods=['POST'])
-def verificar_ots_desde_archivo():
-    if 'archivo' not in request.files:
-        return jsonify({'error': 'No se subió ningún archivo'}), 400
-
-    archivo = request.files['archivo']
-
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        ruta_temp = tmp.name
-        archivo.save(ruta_temp)
+    temp_path = f"/tmp/{file.filename}"
+    file.save(temp_path)
 
     try:
-        resultado = subprocess.run(
-            ['ots', 'verify', ruta_temp],
-            capture_output=True,
-            text=True
-        )
-
-        os.remove(ruta_temp)
-
-        if resultado.returncode == 0:
-            return jsonify({
-                'verificado': True,
-                'resultado': resultado.stdout
-            })
-        else:
-            return jsonify({
-                'verificado': False,
-                'error': resultado.stderr
-            })
+        result = subprocess.run(["ots", "verify", temp_path], capture_output=True, text=True)
+        output = result.stdout + result.stderr
+        verificado = "success" in output.lower()
+        return jsonify({"archivo": file.filename, "verificado": verificado, "salida": output})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
