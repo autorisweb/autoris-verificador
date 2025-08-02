@@ -1,48 +1,44 @@
 from flask import Flask, request, jsonify
 import subprocess
-import tempfile
 import os
 
 app = Flask(__name__)
 
 @app.route('/')
-def home():
-    return 'Autoris Verificador está activo.'
+def index():
+    return 'Microservicio de verificación de estampillas OTS en funcionamiento.'
 
-@app.route('/verify', methods=['GET'])
-def verify():
+@app.route('/verify')
+def verify_hash():
     file_hash = request.args.get('file_hash')
+
     if not file_hash:
-        return jsonify({'error': 'Falta el parámetro file_hash'}), 400
+        return jsonify({'error': 'Parámetro file_hash requerido'}), 400
 
-    # Crear archivo temporal .ots con el hash
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".ots") as tmp_file:
-        tmp_path = tmp_file.name
-        try:
-            tmp_file.write(bytes.fromhex(file_hash))
-        except ValueError:
-            return jsonify({'error': 'El hash no tiene un formato válido (debe estar en hexadecimal)'}), 400
-
-    # Ejecutar la verificación
     try:
-        result = subprocess.run(['ots', 'verify', tmp_path], capture_output=True, text=True)
-        output = result.stdout + result.stderr
+        result = subprocess.run(
+            ['ots', 'verify', f'https://a.pool.opentimestamps.org/{file_hash}.ots'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
         if result.returncode == 0:
-            status = 'válido'
+            return jsonify({
+                'hash': file_hash,
+                'verificado': True,
+                'mensaje': result.stdout
+            })
         else:
-            status = 'inválido o no verificable'
+            return jsonify({
+                'hash': file_hash,
+                'verificado': False,
+                'error': result.stderr
+            }), 400
+
     except Exception as e:
-        output = str(e)
-        status = 'error'
-
-    # Borrar archivo temporal
-    os.remove(tmp_path)
-
-    return jsonify({
-        'hash': file_hash,
-        'estado': status,
-        'detalle': output
-    })
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
