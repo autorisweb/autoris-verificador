@@ -24,9 +24,17 @@ def verificar_ots():
         result = subprocess.run(["ots", "verify", temp_path], capture_output=True, text=True)
         output = result.stdout + result.stderr
         verificado = "success" in output.lower()
-        return jsonify({"archivo": file.filename, "verificado": verificado, "salida": output})
+        return jsonify({
+            "archivo": file.filename,
+            "verificado": verificado,
+            "salida": output
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+# Bloque para correr la app
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
