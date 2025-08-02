@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Verificar archivo OTS</title>
+</head>
+<body>
+    <h1>Subir archivo .ots para verificación</h1>
+    <form action="/verificar_ots" method="post" enctype="multipart/form-data">
+        <label for="ots_file">Archivo .ots:</label>
+        <input type="file" id="ots_file" name="ots_file" accept=".ots" required>
+        <button type="submit">Verificar</button>
+    </form>
+</body>
+</html>
