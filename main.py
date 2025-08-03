@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, render_template
 import subprocess
 import os
 
@@ -9,32 +9,33 @@ def verificar_ots():
     if request.method == "GET":
         return render_template("verificar_ots.html")
 
-    if "ots_file" not in request.files:
-        return jsonify({"error": "No se envió ningún archivo .ots"}), 400
+    if "original_file" not in request.files or "ots_file" not in request.files:
+        return render_template("verificar_ots.html", resultado=True, archivo="Error", verificado=False, salida="Ambos archivos son requeridos.")
 
-    file = request.files["ots_file"]
+    original = request.files["original_file"]
+    ots = request.files["ots_file"]
 
-    if file.filename == "":
-        return jsonify({"error": "Nombre de archivo vacío"}), 400
+    if original.filename == "" or ots.filename == "":
+        return render_template("verificar_ots.html", resultado=True, archivo="Error", verificado=False, salida="Archivos inválidos.")
 
-    temp_path = f"/tmp/{file.filename}"
-    file.save(temp_path)
+    original_path = f"/tmp/{original.filename}"
+    ots_path = f"/tmp/{ots.filename}"
+
+    original.save(original_path)
+    ots.save(ots_path)
 
     try:
-        result = subprocess.run(["ots", "verify", temp_path], capture_output=True, text=True)
+        result = subprocess.run(
+            ["ots", "verify", ots_path, "--file", original_path],
+            capture_output=True,
+            text=True
+        )
         output = result.stdout + result.stderr
         verificado = "success" in output.lower()
-        return jsonify({
-            "archivo": file.filename,
-            "verificado": verificado,
-            "salida": output
-        })
+        return render_template("verificar_ots.html", resultado=True, archivo=ots.filename, verificado=verificado, salida=output)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return render_template("verificar_ots.html", resultado=True, archivo=ots.filename, verificado=False, salida=str(e))
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-# Bloque para correr la app
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+        for path in [original_path, ots_path]:
+            if os.path.exists(path):
+                os.remove(path)
