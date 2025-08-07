@@ -26,7 +26,7 @@ def verificar_ots():
             ["ots", "verify", ots_path, "--file", original_path],
             capture_output=True,
             text=True,
-            timeout=10  # agregamos un timeout por seguridad
+            timeout=10
         )
 
         output = result.stdout + result.stderr
@@ -48,3 +48,7 @@ def verificar_ots():
         for path in [original_path, ots_path]:
             if os.path.exists(path):
                 os.remove(path)
+
+# ✅ Este bloque es obligatorio para correr localmente
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
